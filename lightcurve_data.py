@@ -16,14 +16,14 @@ from scipy.signal import find_peaks
 from tslearn.clustering import KShape
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 
-for i in range (0, 10): 
+df = pd.read_csv('toi-data-caltech.csv')
 
-    # df = pd.read_csv('toi-data-caltech.csv')
-
-    # myTestTic = "TIC " + str(df['TIC ID'][1])
-    # print("TIC Id chosen is :" + myTestTic)
-
-    lcs = search_lightcurve("TIC 466376085", mission="TESS").download_all()
+#for dframe in df['TIC ID']:
+for i in range(0, 10):
+    myTestTic = "TIC " + str(df['TIC ID'][i])
+    print("TIC Id chosen is :" + myTestTic)
+    lcs = search_lightcurve(myTestTic, mission="TESS", author="SPOC").download_all()
+    # testdf = [lc.to_pandas() for lc in lcs]
 
     pandas_dfs = []
     pandas_df = []
@@ -34,6 +34,9 @@ for i in range (0, 10):
                 if 'time' not in pandas_df.columns:
                     pandas_df = pandas_df.reset_index() #Go back to beginning
         pandas_dfs.append(pandas_df)
+        combined_df = pd.concat(pandas_dfs, ignore_index=True)
+        print('Printing all columns from lightcurve data')
+        print(combined_df.head())
         #print(pandas_df.head(5))
         window_size = 150
         X = []
