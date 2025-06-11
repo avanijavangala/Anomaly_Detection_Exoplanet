@@ -15,29 +15,40 @@ import pandas as pd
 from scipy.signal import find_peaks
 from tslearn.clustering import KShape
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
+import os
 
-df = pd.read_csv('toi-data-caltech.csv')
+
+df = pd.read_csv('toi-data-caltech-updated.csv')
+new_pattern = r'\b(APC|FA|FP|PC)\b'
+
+download_dir = "fresh_downloads"
+os.makedirs(download_dir, exist_ok=True)
 
 #for dframe in df['TIC ID']:
 for i in range(0, 10):
     myTestTic = "TIC " + str(df['TIC ID'][i])
     print("TIC Id chosen is :" + myTestTic)
-    lcs = search_lightcurve(myTestTic, mission="TESS", author="SPOC").download_all()
+    lcs = search_lightcurve(myTestTic, mission="TESS", author="SPOC").download_all(download_dir=download_dir)
     # testdf = [lc.to_pandas() for lc in lcs]
-
+    count = 0
     pandas_dfs = []
     pandas_df = []
     for lc in lcs:
+        print('right after lc in lcs')
+        pandas_df = []
         if lc is not None:
             pandas_df = lc.to_pandas() #Converting to pandas data frame
+            print('Converted to pandas_df')
             if lc is not None:  # Check if lc is a valid LightCurve object
                 if 'time' not in pandas_df.columns:
                     pandas_df = pandas_df.reset_index() #Go back to beginning
         pandas_dfs.append(pandas_df)
-        combined_df = pd.concat(pandas_dfs, ignore_index=True)
+        print('Appended pandas_df to pandas_dfs')
+        #combined_df = pd.concat(pandas_dfs, ignore_index=True)
         print('Printing all columns from lightcurve data')
-        print(combined_df.head())
-        #print(pandas_df.head(5))
+        #print(combined_df.head())
+        print(pandas_df.head(5))
+        
         window_size = 150
         X = []
 
@@ -49,7 +60,6 @@ for i in range(0, 10):
 
         X = np.array(X)# Shape: (n_windows, window_size)
 
-
         model = IsolationForest(contamination=0.05, random_state=42)
         labels = model.fit_predict(X)
         scores = model.decision_function(X) 
@@ -59,10 +69,11 @@ for i in range(0, 10):
 
         # indices = np.where(anomaly_times > 3605 and anomaly_times < 3610)
 
-        plt.figure(figsize=(12, 5))
+        print("TIC Id chosen is :" + myTestTic)
+        #plt.figure(figsize=(12, 5))
         plt.plot(pandas_df['time'], pandas_df['flux'], label='Flux', alpha=0.5)
         plt.scatter(anomaly_times, anomaly_fluxes, color='red', label='Anomalies', s=10)
-        plt.title("Isolation Forest Anomalies (TIC 418262301)")
+        plt.title("Isolation Forest Anomalies")
         plt.xlabel("Time (BJD - 2457000)")
         plt.ylabel("Normalized Flux")
         plt.legend()
@@ -143,15 +154,45 @@ for i in range(0, 10):
 
         lc_clean = lc[mask]
 
-        bls = lc_clean.to_periodogram(method="bls", period=np.linspace(0.5, 20, 10000))
-        bls.plot()
+        # bls = lc_clean.to_periodogram(method="bls", period=np.linspace(0.5, 20, 10000))
+        # bls.plot()
+        # plt.show()
+        # lombscargle = lc_clean.to_periodogram(method="lombscargle", period=np.linspace(0.5, 20, 10000))
+        # best_period = lombscargle.period_at_max_power
+        # spike_time = lc_clean.time[np.argmax(lc_clean.flux)]
+        # folded = lc_clean.fold(period=best_period, epoch_time=spike_time)
+        # folded.plot()
+
+        lscargle = lc_clean.to_periodogram(method="lombscargle", period=np.linspace(0.5, 20, 10000))
+        lscargle.plot()
+        plt.title(f"Lomb-Scargle Periodogram")
+        plt.grid(True)
         plt.show()
 
-        best_period = bls.period_at_max_power
+        best_period = lscargle.period_at_max_power
+        spike_time = lc_clean.time[np.argmax(lc_clean.flux)]
+        folded = lc_clean.fold(period=best_period, epoch_time=spike_time)
+        folded.plot()
+        plt.title(f"Folded at P = {best_period:.5f} days, epoch = spike_time")
+        plt.grid(True)
+        filename = str(myTestTic) + "_" + str(count) + '_folded.png'
+        count += 1
+        plot_filename = os.path.join('/Users/avanijavangala/Downloads/CCIR_Project/Anomaly_Detection_Exoplanet', filename)
+        plt.savefig(plot_filename)
+        plt.show()
+
+        # df.loc[df['TFOPWG Disposition'].astype(str).str.contains(new_pattern, case=False, na=False, regex=True)].index
+        # spike_time = lc_clean.time[np.argmax(lc_clean.flux)]
+        # folded = lc_clean.fold(period=best_period, epoch_time=spike_time)
+        # folded.plot()
+        # plt.title(f"Folded at P = {best_period:.5f} days, epoch = spike_time")
+        # plt.grid(True)
+        # plt.show()
+
 
         # Fold the light curve using the best period
-        folded = lc_clean.fold(period=2 * bls.period_at_max_power)
+        #folded = lc_clean.fold(period=2 * bls.period_at_max_power)
 
         # Plot it
-        folded.plot()
-        plt.show()
+        #folded.plot()
+        #plt.show()
